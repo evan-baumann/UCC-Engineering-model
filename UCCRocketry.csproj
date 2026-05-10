@@ -30,6 +30,8 @@
 
   <ItemGroup Label="UCC Rocketry application code">
     <Compile Include="Program.cs" />
+    <Compile Include="RocketParameters.cs" />
+    <Compile Include="Nosecone\**\*.cs" />
   </ItemGroup>
 
   <!--
