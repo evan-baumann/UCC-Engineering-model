@@ -1,0 +1,9 @@
+[submodule "LEAP71_ShapeKernel"]
+	path = LEAP71_ShapeKernel
+	url = https://github.com/leap71/LEAP71_ShapeKernel.git
+[submodule "LEAP71_LatticeLibrary"]
+	path = LEAP71_LatticeLibrary
+	url = https://github.com/leap71/LEAP71_LatticeLibrary.git
+[submodule "LEAP71_HelixHeatX"]
+	path = LEAP71_HelixHeatX
+	url = https://github.com/leap71/LEAP71_HelixHeatX.git

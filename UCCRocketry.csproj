@@ -1,0 +1,59 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <RootNamespace>UCCRocketry</RootNamespace>
+    <AssemblyName>UCCRocketry</AssemblyName>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!--
+      The Leap71 libraries are pre-nullable-reference-types C#. We use the
+      "annotations" mode so any `T?` syntax in submodule code is permitted,
+      but the null-flow analyser is not enforced project-wide (which would
+      flood the build with noise we can't fix in submodule code).
+    -->
+    <Nullable>annotations</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!--
+      The Leap71 sources live inside this project's folder tree as git
+      submodules. To keep their inclusion explicit (one ItemGroup per
+      submodule, mirroring the spirit of a ProjectReference), we disable
+      the SDK's implicit *.cs glob and list each library's source roots
+      below.
+    -->
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup Label="PicoGK voxel engine (NuGet)">
+    <PackageReference Include="PicoGK" Version="2.0.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="UCC Rocketry application code">
+    <Compile Include="Program.cs" />
+  </ItemGroup>
+
+  <!--
+    ============================================================================
+    Leap71 source-only "project references"
+    ============================================================================
+    Each of the three repositories below is included as a git submodule (see
+    .gitmodules). They do not ship as standalone .csproj projects, so instead
+    of <ProjectReference> we compile their source trees directly into this
+    assembly. Examples/ and Documentation/ are excluded so we only pick up the
+    library code itself.
+  -->
+
+  <ItemGroup Label="Leap71 ShapeKernel (submodule: LEAP71_ShapeKernel)">
+    <Compile Include="LEAP71_ShapeKernel\ShapeKernel\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup Label="Leap71 LatticeLibrary (submodule: LEAP71_LatticeLibrary)">
+    <Compile Include="LEAP71_LatticeLibrary\LatticeLibrary\**\*.cs" />
+    <Compile Include="LEAP71_LatticeLibrary\ImplicitLibrary\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup Label="Leap71 HelixHeatX (submodule: LEAP71_HelixHeatX)">
+    <Compile Include="LEAP71_HelixHeatX\src\**\*.cs" />
+  </ItemGroup>
+
+</Project>
