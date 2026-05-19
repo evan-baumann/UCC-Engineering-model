@@ -30,19 +30,31 @@ A 3D viewer opens. The **terminal** prints the active rocket config and, when fi
 
 ---
 
-## Where to edit (one file for routine work)
+## Where to edit
 
-Almost all vehicle-specific inputs live in **`Rockets.cs`**.
+### Routine work → **`Rockets.cs` only**
+
+All vehicle-specific numbers (diameter, nose, fins, OpenRocket baselines) and viewer/export toggles are set in **`Rockets.cs`**. That is the only file the structural team should need.
 
 | Goal | Location in `Rockets.cs` |
 |------|-------------------------|
 | Switch vehicle (Cerberus, Orpheus, …) | §2 — `Active = …` |
-| Change body OD, length, Mach | §1 — your rocket’s `RocketParameters` block |
-| Nose length, shoulder, wall | §1 — same block |
-| Fin sizing & OpenRocket baselines | §1 — same block |
+| Change body OD, length, Mach | §1 — your rocket definition (e.g. `Cerberus = new(...)`) |
+| Nose length, shoulder, wall | §1 — same definition |
+| Fin sizing & OpenRocket baselines | §1 — same definition |
 | Show/hide nose, fins, body; export STL | §3 — toggles |
 
-You should **not** need to edit `Program.cs`, `Scene.cs`, or `SmartNosecone.cs` for normal parameter changes.
+Each rocket in §1 is written as `new RocketParameters(...)` — you edit the **argument values** in `Rockets.cs`, not a separate config file.
+
+### Do not edit for normal work
+
+| File | Role |
+|------|------|
+| **`RocketParameters.cs`** | Defines the *shape* of a rocket record (field names, defaults, team-wide constants like tab depth). **Not** where per-vehicle numbers live. |
+| `Program.cs`, `Scene.cs` | Runtime / viewer plumbing |
+| `Nosecone/SmartNosecone.cs`, `Fins/SmartFinModule.cs` | Geometry and MDO logic |
+
+`RocketParameters` is the **type**; `Rockets.cs` **governs** which rocket is active and what values it carries.
 
 ---
 
@@ -54,7 +66,7 @@ In `Rockets.cs` §2:
 public static readonly RocketParameters Active = Orpheus;  // or Cerberus, Eclipse, …
 ```
 
-Each rocket is defined in §1 by copying an existing block and renaming it.
+Each rocket is defined in §1 by copying an existing `new RocketParameters(...)` block and renaming the field (e.g. `Cerberus`, `Orpheus`).
 
 ---
 
@@ -98,15 +110,17 @@ Keep your real `fNoseLengthMm` in source for documentation; set `bAutoNoseLength
 ### Nose viewer & export (`Rockets.cs` §3)
 
 ```csharp
-public static readonly bool ShowNosecone = true;   // preview in viewer
-public static readonly bool ExportStl = true;      // writes exports/{RocketName}_nose.stl
+public static readonly bool ShowNosecone = true;        // preview in viewer (optional)
+public static readonly bool ExportNoseconeStl = true;   // writes exports/{RocketName}_nose.stl
 ```
+
+Export works even when `ShowNosecone` is `false` (faster if you only need the STL).
 
 ---
 
 ## Fin parameters
 
-Fin geometry is built by **`Fins/SmartFinModule.cs`** from the same `RocketParameters` block in **`Rockets.cs` §1**.
+Fin geometry is built by **`Fins/SmartFinModule.cs`** using the active rocket’s values from **`Rockets.cs` §1** (passed in via `Rockets.Active`).
 
 ### Structural / planform (edit in `Rockets.cs`)
 
@@ -141,21 +155,19 @@ Import these from OpenRocket (no fins, consistent mass basis) so the fin optimiz
 
 The MDO loop grows **semi-span** from the floor until `fTargetStaticMargin` is reached (or hits an internal cap).
 
-### Fixed fin geometry (code defaults — change only if needed)
+### Fixed fin geometry (developers only — not in `Rockets.cs`)
 
-These are **not** in `Rockets.cs`; they live in `RocketParameters.cs` (module constants) or `SmartFinModule.cs`:
+These are team-wide defaults baked into the engine. Changing them requires editing source outside `Rockets.cs` (coordinate with simulation / structures owners):
 
-| Item | Value | File |
-|------|-------|------|
+| Item | Value | Where defined |
+|------|-------|----------------|
 | Tip chord | 52% of root chord | `SmartFinModule.cs` |
-| Tip chord fraction | `0.52` | hard-coded in optimizer/mesh |
-| TTW tab radial depth | 15 mm | `RocketParameters.FinModuleTtwTabRadialDepthMm` |
-| Tab length / root chord | 0.55 | `FinModuleTtwTabChordFraction` |
-| Min peak thickness | 6 mm | `FinModuleMinPeakThicknessMm` |
-| Min edge thickness | 2 mm | `FinModuleMinEdgeThicknessMm` |
+| TTW tab radial depth | 15 mm | `RocketParameters.cs` (`FinModuleTtwTabRadialDepthMm`) |
+| Tab length / root chord | 0.55 | `RocketParameters.cs` (`FinModuleTtwTabChordFraction`) |
+| Min peak / edge thickness | 6 mm / 2 mm | `RocketParameters.cs` |
 | Fin count | 4 | `SmartFinModule.cs` |
 
-Airfoil cross-section (rounded vs hex wedge) follows **`fMaxMach`** via `FinAirfoilRegime` thresholds in `RocketParameters.cs` (`0.65` / `1.30` Mach).
+Airfoil cross-section (rounded vs hex wedge) follows **`fMaxMach`** you set in `Rockets.cs`; Mach thresholds (`0.65` / `1.30`) are fixed in `RocketParameters.cs`.
 
 ### Fin viewer & export (`Rockets.cs` §3)
 
@@ -207,7 +219,7 @@ In **`Rockets.cs` §3**:
 | `ShowFins` | `true` | Run fin MDO + preview |
 | `ShowBodyTube` | `false` | Cylindrical body for context |
 | `ShowPintleInjector` | `false` | Engine injector (separate subsystem) |
-| `ExportStl` | `false` | Nose STL → `exports/` |
+| `ExportNoseconeStl` | `false` | Nose STL → `exports/{name}_nose.stl` |
 | `ExportFinStl` | `false` | Fin assembly STL → `exports/` |
 | `FinPreviewTransparent` | `false` | Semi-transparent fin preview |
 
@@ -216,8 +228,8 @@ In **`Rockets.cs` §3**:
 ## Project layout
 
 ```text
-Rockets.cs              ← EDIT HERE (vehicles + toggles)
-RocketParameters.cs     ← Data schema + fin/nose module constants
+Rockets.cs              ← EDIT HERE: all per-rocket values + toggles
+RocketParameters.cs     ← Type definition + shared constants (do not edit for Cerberus/Orpheus numbers)
 Program.cs              ← Entry point (runtime voxel size)
 Scene.cs                ← Assembles nose + body preview
 Nosecone/SmartNosecone.cs
@@ -237,14 +249,15 @@ LEAP71 libraries are git **submodules** under `LEAP71_ShapeKernel/`, etc.
 3. Paste OpenRocket CG/CP/mass/CNa into the fin baseline fields.
 4. Set `fMinRootChordRatio` / `fMinSemiSpanRatio` to team standards (Cerberus: `1.42`, `0.75`).
 5. Set `fTargetStaticMargin` to program requirement (often 2–2.6 cal).
-6. `dotnet run` — check terminal SM and masses; enable `ExportFinStl` / `ExportStl` for CAD handoff.
+6. `dotnet run` — check terminal SM and masses; enable `ExportNoseconeStl` / `ExportFinStl` for CAD handoff.
 7. Compare STL or viewer geometry to OpenRocket trapezoidal fin entries (root, tip, height, sweep).
 
 ---
 
 ## Questions / deeper changes
 
-- **New rocket:** copy a `RocketParameters` block in `Rockets.cs` §1.
+- **New rocket:** copy an existing rocket definition in `Rockets.cs` §1, rename it, edit the `new RocketParameters(...)` values.
+- **Add a new parameter every rocket should have:** that requires changing `RocketParameters.cs` (the record) *and then* setting values in `Rockets.cs` — simulation owner task.
 - **Change nose mathematics** (profile equations): `Nosecone/SmartNosecone.cs` — coordinate with aerodynamics.
 - **Change fin mesh rules** (tabs, airfoil, MDO): `Fins/SmartFinModule.cs` — coordinate with structures + GNC.
 
