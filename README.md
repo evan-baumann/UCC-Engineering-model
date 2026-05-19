@@ -32,29 +32,33 @@ A 3D viewer opens. The **terminal** prints the active rocket config and, when fi
 
 ## Where to edit
 
-### Routine work → **`Rockets.cs` only**
+### Routine work → **`Rockets.cs`** (+ voxel size in **`Program.cs`**)
 
-All vehicle-specific numbers (diameter, nose, fins, OpenRocket baselines) and viewer/export toggles are set in **`Rockets.cs`**. That is the only file the structural team should need.
+All vehicle-specific numbers (diameter, nose, fins, OpenRocket baselines) and viewer/export toggles are set in **`Rockets.cs`**.
 
-| Goal | Location in `Rockets.cs` |
-|------|-------------------------|
-| Switch vehicle (Cerberus, Orpheus, …) | §2 — `Active = …` |
-| Change body OD, length, Mach | §1 — your rocket definition (e.g. `Cerberus = new(...)`) |
-| Nose length, shoulder, wall | §1 — same definition |
-| Fin sizing & OpenRocket baselines | §1 — same definition |
-| Show/hide nose, fins, body; export STL | §3 — toggles |
+| Goal | Where to edit |
+|------|----------------|
+| Switch vehicle (Cerberus, Orpheus, …) | `Rockets.cs` §2 — `Active = …` |
+| Change body OD, length, Mach | `Rockets.cs` §1 — your rocket definition (e.g. `Cerberus = new(...)`) |
+| Nose length, shoulder, wall | `Rockets.cs` §1 — same definition |
+| Fin sizing & OpenRocket baselines | `Rockets.cs` §1 — same definition |
+| Show/hide nose, fins, body; export STL | `Rockets.cs` §3 — toggles |
+| **Voxel / mesh resolution (STL quality, speed)** | **`Program.cs` only** — see [Voxel size](#voxel-size) |
 
 Each rocket in §1 is written as `new RocketParameters(...)` — you edit the **argument values** in `Rockets.cs`, not a separate config file.
+
+`RocketParameters` is the **type**; `Rockets.cs` **governs** which rocket is active and what values it carries.
 
 ### Do not edit for normal work
 
 | File | Role |
 |------|------|
 | **`RocketParameters.cs`** | Defines the *shape* of a rocket record (field names, defaults, team-wide constants like tab depth). **Not** where per-vehicle numbers live. |
-| `Program.cs`, `Scene.cs` | Runtime / viewer plumbing |
+| **`Program.cs`** | Entry point — **only edit `runtimeVoxelSizeMm`** (nothing else in this file for routine work). |
+| `Scene.cs` | Assembles nose/body preview and nose STL export |
 | `Nosecone/SmartNosecone.cs`, `Fins/SmartFinModule.cs` | Geometry and MDO logic |
 
-`RocketParameters` is the **type**; `Rockets.cs` **governs** which rocket is active and what values it carries.
+> **Note:** `fVoxelSizeMm` on a rocket definition in `Rockets.cs` is **not** used at runtime. Voxel size is controlled solely by `Program.cs` (see below).
 
 ---
 
@@ -85,7 +89,6 @@ Set these on your rocket in **`Rockets.cs` §1**. They feed `Nosecone/SmartNosec
 | `fNoseShoulderDiameterMm` | mm | Shoulder OD. `0` = auto (~0.92× body OD) |
 | `bNoseShoulderCapped` | bool | `true` = closed bulkhead disk at shoulder base |
 | `fNoseBluffnessRatio` | — | Tip bluntness for hypersonic regime only (default `0.15`) |
-| `fVoxelSizeMm` | mm | Mesh resolution (smaller = finer STL, slower). Default `0.3` on record; runtime in `Program.cs` is `0.25` |
 
 ### Nose shape vs Mach (`fMaxMach`)
 
@@ -197,9 +200,41 @@ Copy planform values into OpenRocket’s **trapezoidal fin set** (mm, 4 fins). U
 
 ---
 
+## Voxel size
+
+PicoGK voxel resolution controls **preview smoothness**, **STL facet quality**, **build time**, and **file size** for nose, fins, and body. It applies to the whole run.
+
+**Edit only this in `Program.cs`** — do not change anything else in that file unless you are maintaining the app entry point.
+
+In `Program.cs`, inside `Main()`:
+
+```csharp
+const float runtimeVoxelSizeMm = 0.25f;
+
+Library.Go(
+    fVoxelSizeMM:   runtimeVoxelSizeMm,
+    ...
+);
+```
+
+Change `runtimeVoxelSizeMm` to the value you want (millimetres).
+
+| Value (mm) | Typical use |
+|------------|-------------|
+| `0.50` | Fast preview; visible stair-steps on curves |
+| `0.25` | **Current default** — good balance for development |
+| `0.15` | Near-CAD quality; slower, larger STL |
+| `0.10` | Print-ready; long builds, high RAM |
+
+On startup, the terminal logs the active resolution as `Library voxel = … mm` (from `Scene.Build`).
+
+**STL exports:** coarser voxels → smaller files and faster export; finer voxels → heavier meshes for CAD/slicers. If a nose STL is very large, try `0.35`–`0.50` mm before changing geometry.
+
+---
+
 ## Shared body parameters
 
-These affect nose, fins, and body context together:
+These affect nose, fins, and body context together (all in **`Rockets.cs` §1**):
 
 | Parameter | Meaning |
 |-----------|---------|
@@ -229,9 +264,9 @@ In **`Rockets.cs` §3**:
 
 ```text
 Rockets.cs              ← EDIT HERE: all per-rocket values + toggles
-RocketParameters.cs     ← Type definition + shared constants (do not edit for Cerberus/Orpheus numbers)
-Program.cs              ← Entry point (runtime voxel size)
-Scene.cs                ← Assembles nose + body preview
+Program.cs              ← EDIT HERE: runtimeVoxelSizeMm only (voxel / STL resolution)
+RocketParameters.cs     ← Type definition + shared constants (not per-rocket numbers)
+Scene.cs                ← Assembles nose + body preview (no routine edits)
 Nosecone/SmartNosecone.cs
 Fins/SmartFinModule.cs
 Engines/PintleInjector.cs
@@ -249,14 +284,16 @@ LEAP71 libraries are git **submodules** under `LEAP71_ShapeKernel/`, etc.
 3. Paste OpenRocket CG/CP/mass/CNa into the fin baseline fields.
 4. Set `fMinRootChordRatio` / `fMinSemiSpanRatio` to team standards (Cerberus: `1.42`, `0.75`).
 5. Set `fTargetStaticMargin` to program requirement (often 2–2.6 cal).
-6. `dotnet run` — check terminal SM and masses; enable `ExportNoseconeStl` / `ExportFinStl` for CAD handoff.
-7. Compare STL or viewer geometry to OpenRocket trapezoidal fin entries (root, tip, height, sweep).
+6. Set `runtimeVoxelSizeMm` in `Program.cs` if STL quality or file size needs tuning (see [Voxel size](#voxel-size)).
+7. `dotnet run` — check terminal SM and masses; enable `ExportNoseconeStl` / `ExportFinStl` for CAD handoff.
+8. Compare STL or viewer geometry to OpenRocket trapezoidal fin entries (root, tip, height, sweep).
 
 ---
 
 ## Questions / deeper changes
 
 - **New rocket:** copy an existing rocket definition in `Rockets.cs` §1, rename it, edit the `new RocketParameters(...)` values.
+- **Finer or coarser meshes / STLs:** change `runtimeVoxelSizeMm` in `Program.cs` only.
 - **Add a new parameter every rocket should have:** that requires changing `RocketParameters.cs` (the record) *and then* setting values in `Rockets.cs` — simulation owner task.
 - **Change nose mathematics** (profile equations): `Nosecone/SmartNosecone.cs` — coordinate with aerodynamics.
 - **Change fin mesh rules** (tabs, airfoil, MDO): `Fins/SmartFinModule.cs` — coordinate with structures + GNC.

@@ -8,7 +8,9 @@
 //  │  Where do I edit … ?                                               │
 //  ├────────────────────────────────────────────────────────────────────┤
 //  │  · Rocket designs / toggles   → Rockets.cs (incl. pintle viewer)   │
-//  │  · OpenRocket baselines       → RocketParameters / Rockets        │
+//  │  · Voxel size (STL quality)   → runtimeVoxelSizeMm below (only edit here) │
+//  │  · OpenRocket baselines       → Rockets.cs §1                       │
+//  │  · Nosecone STL               → ExportNoseconeStl                     │
 //  │  · Fin export STL             → ExportFinStl                        │
 //  │  · Pintle injector STL        → ExportPintleInjectorStl             │
 //  │  · Fin MDO + CAD              → Fins/SmartFinModule.cs            │
