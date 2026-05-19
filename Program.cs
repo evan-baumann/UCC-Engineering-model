@@ -1,170 +1,145 @@
 ﻿// =============================================================================
-//  UCC Rocketry – Computational Engineering Model
+//  UCC Rocketry — Computational Engineering Model
 //  -----------------------------------------------------------------------------
-//  Entry point. Boots the PicoGK runtime (voxel kernel + viewer) and renders:
+//  Entry point. Boots the PicoGK runtime and hands scene construction to
+//  Scene.Build, then optionally builds solid fin geometry from Rockets.Active.
 //
-//    1. The rocket body (cylinder), behind the nosecone showcase.
-//    2. Three SmartNosecone instances side-by-side, one per Mach regime, so
-//       every branch of the regime selector is visually verified at a glance:
-//         · M = 0.5  → Subsonic     → Elliptical
-//         · M = 3.5  → Supersonic   → Sharp Von Kármán
-//         · M = 6.0  → Hypersonic   → Spherically Blunted Cone
-//       The instance whose Mach matches the rocket's design fMaxMach is the
-//       "actual rocket" nosecone — it's the one that will physically attach
-//       to the body. The other two are visual reference only.
+//  ┌────────────────────────────────────────────────────────────────────┐
+//  │  Where do I edit … ?                                               │
+//  ├────────────────────────────────────────────────────────────────────┤
+//  │  · Rocket designs / toggles   → Rockets.cs (incl. pintle viewer)   │
+//  │  · OpenRocket baselines       → RocketParameters / Rockets        │
+//  │  · Fin export STL             → ExportFinStl                        │
+//  │  · Pintle injector STL        → ExportPintleInjectorStl             │
+//  │  · Fin MDO + CAD              → Fins/SmartFinModule.cs            │
+//  │  · Nosecone                   → Nosecone/SmartNosecone.cs        │
+//  └────────────────────────────────────────────────────────────────────┘
 //
-//  Every dimension below is derived from `RocketParameters.Default` (see
-//  RocketParameters.cs) — there are no magic numbers in this file.
-//
-//  Built on top of:
-//    - PicoGK              (voxel geometry kernel,         NuGet)
-//    - LEAP71_ShapeKernel  (parametric shape primitives,   git submodule)
-//    - LEAP71_LatticeLib.  (lattice / TPMS infill toolkit, git submodule)
-//    - LEAP71_HelixHeatX   (helical heat-exchanger demo,   git submodule)
+//  Built on top of: PicoGK, LEAP71_ShapeKernel (+ HelixHeatX demo submodule).
 // =============================================================================
 
+using System.IO;
 using System.Numerics;
+using System.Reflection;
 using PicoGK;
 using Leap71.ShapeKernel;
-using UCCRocketry.Nosecone;
+using UCCRocketry.Fins;
 
 namespace UCCRocketry
 {
     internal static class Program
     {
-        // ============================================================== //
-        //  ACTIVE ROCKET — change this one line to switch designs.       //
-        //  --------------------------------------------------------------//
-        //  Available configs (defined in RocketParameters.cs):           //
-        //    · RocketParameters.Cerberus      — UCCRPL two-stage M 0.77  //
-        //    · RocketParameters.Pathfinder    — subscale subsonic test   //
-        //    · RocketParameters.Competition   — main supersonic rocket   //
-        //    · RocketParameters.HighAltitude  — hypersonic stretch goal  //
-        //    · RocketParameters.Default       — alias to the primary one //
-        //                                                                //
-        //  Add your own by appending another `public static readonly     //
-        //  RocketParameters …` to RocketParameters.cs.                   //
-        // ============================================================== //
-        private static readonly RocketParameters Rocket = RocketParameters.Cerberus;
-
         public static void Main()
         {
-            PicoGK.Library.Go(
-                fVoxelSizeMM:    Rocket.fVoxelSizeMm,
-                fnTask:          BuildScene,
-                strWindowTitle:  "UCC Rocketry — Computational Engineering Model");
+            // Smaller voxels reduce cross-bore artifacts; nominal hole sizes live in PintleInjector only.
+            const float runtimeVoxelSizeMm = 0.25f;
+
+            Library.Go(
+                fVoxelSizeMM:   runtimeVoxelSizeMm,
+                fnTask:         BuildSceneAndFins,
+                strWindowTitle: "UCC Rocketry — Computational Engineering Model");
         }
 
-        /// <summary>
-        /// Construction task executed inside the PicoGK runtime.
-        /// </summary>
-        private static void BuildScene()
+        static void BuildSceneAndFins()
         {
-            try
+            Scene.Build();
+
+            // =========================================================
+            // PHASE 3: ARGES PDE INJECTOR
+            // =========================================================
+            if (Rockets.ShowPintleInjector)
             {
-                Library.Log(
-                    $"Rocket configuration: " +
-                    $"Ø{Rocket.fOuterDiameterMm:0.#} mm × " +
-                    $"{Rocket.TotalLengthMm:0.#} mm total " +
-                    $"(body {Rocket.fBodyLengthMm:0.#} + nose {Rocket.fNoseLengthMm:0.#}), " +
-                    $"design M = {Rocket.fMaxMach:0.0}.");
+                var oInjector = new UCCRocketry.Engines.PintleInjector();
+                Voxels voxInjectorLocal = oInjector.voxConstruct();
 
-                BuildRocketBody();
-                BuildNoseconeShowcase();
+                if (Rockets.ExportPintleInjectorStl)
+                    ExportPintleInjectorStl(voxInjectorLocal);
+
+                // Move the injector down the Z-axis by 600mm so it sits inside the tube
+                Vector3 vecInjectorShiftMm = new Vector3(0, 0, 600f);
+                Voxels voxInjectorTranslated = MeshUtility.voxApplyTransformation(
+                    voxInjectorLocal,
+                    vecPt => vecPt + vecInjectorShiftMm);
+
+                // Preview in scene coordinates (+600 mm Z vs CAD export).
+                Sh.PreviewVoxels(voxInjectorTranslated, Cp.clrRock, 1.0f);
             }
-            catch (Exception ex)
+            else
             {
-                Library.Log($"Scene construction failed: {ex}");
+                Library.Log("Skipping pintle injector (Rockets.ShowPintleInjector = false).");
             }
-        }
+            // =========================================================
 
-        // ------------------------------------------------------------------ //
-        //  Rocket body (cylinder, parked behind the nosecone showcase)       //
-        // ------------------------------------------------------------------ //
-        private static void BuildRocketBody()
-        {
-            Library.Log("Building rocket body...");
+            if (!Rockets.ShowFins)
+            {
+                Library.Log("Skipping fins (Rockets.ShowFins = false).");
+                return;
+            }
 
-            LocalFrame oFrame = new LocalFrame(new Vector3(0f, -300f, 0f));
+            RocketParameters rk = Rockets.Active;
+            var oFins = new SmartFinModule(rk);
+            oFins.OptimizeFinDimensions();
 
-            BaseCylinder oRocketBody = new BaseCylinder(
-                oFrame:  oFrame,
-                fLength: Rocket.fBodyLengthMm,
-                fRadius: Rocket.OuterRadiusMm);
-
-            Voxels voxRocketBody = oRocketBody.voxConstruct();
-            Sh.PreviewVoxels(voxRocketBody, Cp.clrRock);
+            Vector3 finDelta = oFins.FinAssemblyWorldTranslationMm();
 
             Library.Log(
-                $"  rocket body voxelised: " +
-                $"Ø{Rocket.fOuterDiameterMm:0.#} mm × {Rocket.fBodyLengthMm:0.#} mm.");
+                $"SmartFinModule (M={rk.fMaxMach:0.##}, Ø{rk.fOuterDiameterMm:0.#} mm, L_body={rk.fBodyLengthMm:0.#} mm, " +
+                $"ρ_fin={rk.fFinMaterialDensityKgM3:0.#} kg/m³): " +
+                $"semi-span = {oFins.OptimalSemiSpanMm:0.#} mm (floor {oFins.MinSemiSpanAeroMm:0.#} = {rk.fMinSemiSpanRatio:0.##}×Ø), " +
+                $"root chord = {oFins.RootChordMm:0.#} mm ({rk.fMinRootChordRatio:0.##}×Ø), " +
+                $"tip chord = {0.52f * oFins.RootChordMm:0.#} mm, m_fin×4 ≈ {oFins.EstimatedTotalFinMassKg:0.###} kg, " +
+                $"SM = {oFins.LastStaticMarginCalib:0.###} cal ((CP−CG)/Ø), " +
+                $"CG_combo ≈ {oFins.CombinedCgMmFromNose:0.#} mm, CP_combo ≈ {oFins.CombinedCpMmFromNose:0.#} mm (nose); " +
+                $"fin C_Nα ≈ {oFins.LastFinSetCNa:0.##} vs body {rk.fBodyNoFinsCNa:0.#}; " +
+                $"pose ΔZ = {finDelta.Z:0.#} mm.");
+
+            Voxels voxFinAssembly = oFins.VoxConstruct();
+            voxFinAssembly = MeshUtility.voxApplyTransformation(voxFinAssembly, p => p + finDelta);
+
+            if (Rockets.FinPreviewTransparent)
+            {
+                Sh.PreviewVoxels(voxFinAssembly, Cp.clrRock, Rockets.FinPreviewTransparencyAlpha);
+                Library.Log($"Fin assembly: transparency = {Rockets.FinPreviewTransparencyAlpha:0.##}.");
+            }
+            else
+                Sh.PreviewVoxels(voxFinAssembly, Cp.clrRock);
+
+            if (Rockets.ExportFinStl)
+                ExportFinStl(voxFinAssembly);
         }
 
-        // ------------------------------------------------------------------ //
-        //  SmartNosecone — one render per Mach regime                        //
-        //  ----------------------------------------------------------------  //
-        //  The three Mach values below are *deliberately fixed* so that all  //
-        //  three branches of the regime selector appear in the viewer for    //
-        //  visual regression. Geometry (radius, length, wall, bluffness) is  //
-        //  drawn from RocketParameters — only the Mach number varies.        //
-        // ------------------------------------------------------------------ //
-        private static void BuildNoseconeShowcase()
+        static void ExportPintleInjectorStl(Voxels voxInjectorCadFrame)
         {
-            Library.Log("Building SmartNosecone showcase...");
-
-            // Spacing: 2.5 × outer radius gives a clear gap between adjacent noses.
-            float fSpacing = 2.5f * Rocket.OuterRadiusMm;
-
-            // Determine which slot represents the active rocket's actual nose
-            // by REGIME (not by exact Mach), so the marker stays meaningful as
-            // configs change (e.g. Cerberus M=0.77 still highlights M=0.5).
-            SmartNosecone.ENoseRegime eActiveRegime =
-                new SmartNosecone(
-                    fBaseRadiusMm: Rocket.OuterRadiusMm,
-                    fLengthMm:     Rocket.fNoseLengthMm,
-                    fMaxMach:      Rocket.fMaxMach).Regime;
-
-            (float fX, float fMach, ColorFloat clr)[] aSlots =
-            {
-                (-fSpacing, 0.5f, Cp.clrFrozen),    // subsonic   — light blue
-                ( 0f,       3.5f, Cp.clrYellow),    // supersonic — yellow
-                ( fSpacing, 6.0f, Cp.clrWarning),   // hypersonic — orange
-            };
-
-            foreach ((float fX, float fMach, ColorFloat clr) in aSlots)
-            {
-                LocalFrame    oFrame = new LocalFrame(new Vector3(fX, 0f, 0f));
-                SmartNosecone oNose  = new SmartNosecone(
-                    fBaseRadiusMm:     Rocket.OuterRadiusMm,
-                    fLengthMm:         Rocket.fNoseLengthMm,
-                    fMaxMach:          fMach,
-                    oFrame:            oFrame,
-                    fWallThicknessMm:  Rocket.fWallThicknessMm,
-                    fBluffnessRatio:   Rocket.fNoseBluffnessRatio,
-                    fShoulderLengthMm: Rocket.fNoseShoulderLengthMm,
-                    fShoulderRadiusMm: Rocket.NoseShoulderRadiusMm,
-                    bShoulderCapped:   Rocket.bNoseShoulderCapped);
-
-                Voxels voxNose = oNose.voxConstruct();
-                Sh.PreviewVoxels(voxNose, clr);
-
-                bool   bIsActualRegime = oNose.Regime == eActiveRegime;
-                string strMarker       = bIsActualRegime
-                    ? $"  ◀── matches active rocket (M = {Rocket.fMaxMach:0.00})"
-                    : "";
-                Library.Log(
-                    $"  M = {fMach:0.0}  →  {oNose.Regime}{strMarker}");
-            }
-
-            if (Rocket.fNoseShoulderLengthMm > 0f)
-            {
-                Library.Log(
-                    $"  shoulder: Ø{Rocket.fNoseShoulderDiameterMm:0.#} mm × " +
-                    $"{Rocket.fNoseShoulderLengthMm:0.#} mm" +
-                    (Rocket.bNoseShoulderCapped ? " (capped)" : " (open)"));
-            }
-
-            Library.Log("SmartNosecone showcase complete.");
+            string name = ResolveActiveRocketName();
+            Directory.CreateDirectory("exports");
+            string path = Path.Combine("exports", $"{name}_pintle_injector.stl");
+            Sh.ExportVoxelsToSTLFile(voxInjectorCadFrame, path);
+            Library.Log($"STL export (pintle, CAD frame Z=0 at bulkhead): {Path.GetFullPath(path)}.");
         }
+
+        static void ExportFinStl(Voxels voxAssemblyWorld)
+        {
+            string name = ResolveActiveRocketName();
+            Directory.CreateDirectory("exports");
+            string pathAsm = Path.Combine("exports", $"{name}_fin_assembly.stl");
+            Sh.ExportVoxelsToSTLFile(voxAssemblyWorld, pathAsm);
+            Library.Log($"STL export: {Path.GetFullPath(pathAsm)}.");
+        }
+
+        static string ResolveActiveRocketName()
+        {
+            foreach (FieldInfo field in typeof(Rockets).GetFields(BindingFlags.Public | BindingFlags.Static))
+            {
+                if (field.FieldType != typeof(RocketParameters)) continue;
+                if (field.Name == nameof(Rockets.Active)) continue;
+                if (ReferenceEquals(field.GetValue(null), Rockets.Active))
+                    return field.Name;
+            }
+            return "rocket";
+        }
+        
     }
+    
 }
+
+

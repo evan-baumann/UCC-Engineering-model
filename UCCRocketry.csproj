@@ -29,9 +29,15 @@
   </ItemGroup>
 
   <ItemGroup Label="UCC Rocketry application code">
-    <Compile Include="Program.cs" />
-    <Compile Include="RocketParameters.cs" />
+    <!--
+      Glob the project root so any new top-level .cs file (e.g. a new
+      Rockets/Scene/etc.) auto-compiles without requiring a .csproj edit.
+      Subfolders containing application code are listed explicitly below.
+    -->
+    <Compile Include="*.cs" />
+    <Compile Include="Engines\**\*.cs" />
     <Compile Include="Nosecone\**\*.cs" />
+    <Compile Include="Fins\**\*.cs" />
   </ItemGroup>
 
   <!--
