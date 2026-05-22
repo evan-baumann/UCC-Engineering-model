@@ -3,7 +3,7 @@ using System.Numerics;
 using PicoGK;
 using Leap71.ShapeKernel;
 
-namespace UCCRocketry.Engines
+namespace Tintreach.Engines
 {
     public class PintleInjector
     {
@@ -163,5 +163,12 @@ namespace UCCRocketry.Engines
 
             return voxFinalInjector;
         }
+
+        /// <summary>Apex of the thermal cap along +Z (mm from bulkhead base at Z=0).</summary>
+        public float PintleTipZMm() =>
+            m_fBulkheadThickness + m_fPintleProtrusion + m_fPintleDiameter / 2f;
+
+        /// <summary>+Z where the combustor tube inlet meets the bulkhead face.</summary>
+        public float CombustorInletZMm() => m_fBulkheadThickness;
     }
 }

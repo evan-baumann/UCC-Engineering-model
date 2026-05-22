@@ -1,5 +1,5 @@
 // =============================================================================
-//  UCC Rocketry — SmartFinModule (Solid, Fast, Crash-Proof)
+//  Tintreach Propulsion — SmartFinModule (Solid, Fast, Crash-Proof)
 // =============================================================================
 
 using System;
@@ -8,7 +8,7 @@ using System.Numerics;
 using PicoGK;
 using Leap71.ShapeKernel;
 
-namespace UCCRocketry.Fins
+namespace Tintreach.Fins
 {
     public sealed class SmartFinModule
     {

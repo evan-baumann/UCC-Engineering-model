@@ -1,5 +1,5 @@
 // =============================================================================
-//  UCC Rocketry — Scene
+//  Tintreach — Scene
 //  -----------------------------------------------------------------------------
 //  Engine plumbing that turns the active rocket (Rockets.Active) into PicoGK
 //  voxels and previews them in the viewer. You should never need to edit this
@@ -15,9 +15,9 @@ using System.Numerics;
 using System.Reflection;
 using PicoGK;
 using Leap71.ShapeKernel;
-using UCCRocketry.Nosecone;
+using Tintreach.Nosecone;
 
-namespace UCCRocketry
+namespace Tintreach
 {
     /// <summary>
     /// PicoGK construction task entry-point. Composes the scene from

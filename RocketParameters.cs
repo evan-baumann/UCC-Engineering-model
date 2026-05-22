@@ -1,5 +1,5 @@
 // =============================================================================
-//  UCC Rocketry — RocketParameters
+//  Tintreach Propulsion — RocketParameters
 //  -----------------------------------------------------------------------------
 //  Engine type definition for a rocket's physical configuration. Pure library
 //  code — you should never need to edit this file in normal use.
@@ -13,7 +13,7 @@
 //  single value (`fOuterDiameterMm`).
 // =============================================================================
 
-namespace UCCRocketry
+namespace Tintreach
 {
     /// <summary>
     /// Fin airfoil cross-section regime, selected from design Mach.
@@ -131,12 +131,12 @@ namespace UCCRocketry
     /// <param name="fBodyNoFinsCpMm">Baseline CP measured from nose tip (mm).</param>
     /// <param name="fTargetStaticMargin">
     /// Target static margin in calibres: (CombinedCpMm − CombinedCgMm) / fOuterDiameterMm after hybrid fin sizing.
-    /// <see cref="UCCRocketry.Fins.SmartFinModule"/> grows semi-span until this is met, with structural floors
+    /// <see cref="Tintreach.Fins.SmartFinModule"/> grows semi-span until this is met, with structural floors
     /// (semi-span ≥ fOuterDiameterMm × <see cref="fMinSemiSpanRatio"/>, peak thickness ≥ module minimum).
     /// </param>
     /// <param name="fMinRootChordRatio">
     /// Root chord floor as a multiple of body OD (rocketry convention: ratios vs diameter, not radius).
-    /// <see cref="UCCRocketry.Fins.SmartFinModule.RootChordMm"/> = fOuterDiameterMm × this value.
+    /// <see cref="Tintreach.Fins.SmartFinModule.RootChordMm"/> = fOuterDiameterMm × this value.
     /// </param>
     /// <param name="fMinSemiSpanRatio">
     /// Minimum exposed fin semi-span (MDO start / floor) as a multiple of body OD.
@@ -187,7 +187,7 @@ namespace UCCRocketry
         public const float DEFAULT_FINENESS_SUPERSONIC = 6f;
         public const float DEFAULT_FINENESS_HYPERSONIC = 5f;
 
-        // ───────── UCC SmartFinModule — locked structural standards (high-power) ─────────
+        // ───────── Tintreach SmartFinModule — locked structural standards (high-power) ─────────
         /// <summary>Radial TTW tab intrusion past body OD (deep interlock with motor / detonation tube).</summary>
         public const float FinModuleTtwTabRadialDepthMm = 15f;
 

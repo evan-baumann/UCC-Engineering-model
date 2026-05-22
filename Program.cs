@@ -1,5 +1,5 @@
 ﻿// =============================================================================
-//  UCC Rocketry — Computational Engineering Model
+//  Tintreach — Computational Design Suite
 //  -----------------------------------------------------------------------------
 //  Entry point. Boots the PicoGK runtime and hands scene construction to
 //  Scene.Build, then optionally builds solid fin geometry from Rockets.Active.
@@ -13,6 +13,8 @@
 //  │  · Nosecone STL               → ExportNoseconeStl                     │
 //  │  · Fin export STL             → ExportFinStl                        │
 //  │  · Pintle injector STL        → ExportPintleInjectorStl             │
+//  │  · PDE combustor STL          → ExportPdeCombustorStl               │
+//  │  · Divergent nozzle           → ShowDivergentNozzle (§3)           │
 //  │  · Fin MDO + CAD              → Fins/SmartFinModule.cs            │
 //  │  · Nosecone                   → Nosecone/SmartNosecone.cs        │
 //  └────────────────────────────────────────────────────────────────────┘
@@ -23,54 +25,157 @@
 using System.IO;
 using System.Numerics;
 using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Threading;
 using PicoGK;
 using Leap71.ShapeKernel;
-using UCCRocketry.Fins;
+using Tintreach.Engines;
+using Tintreach.Engines.Combustors;
+using Tintreach.Engines.Nozzles;
+using Tintreach.Fins;
 
-namespace UCCRocketry
+namespace Tintreach
 {
     internal static class Program
     {
-        public static void Main()
+        [DllImport("kernel32.dll")]
+        static extern void ExitProcess(uint uExitCode);
+
+        static HeadlessCliOptions? s_headlessOptions;
+
+        public static void Main(string[] args)
         {
-            // Smaller voxels reduce cross-bore artifacts; nominal hole sizes live in PintleInjector only.
+            if (!HeadlessCliOptions.TryParse(args, out HeadlessCliOptions? headlessOptions, out string? parseError))
+            {
+                Console.Error.WriteLine(parseError);
+                Environment.Exit(1);
+            }
+
+            if (headlessOptions is null)
+            {
+                foreach (string arg in args)
+                {
+                    if (arg is "--help" or "-h")
+                    {
+                        Environment.Exit(0);
+                        return;
+                    }
+                }
+
+                RunGuiMode();
+                return;
+            }
+
+            s_headlessOptions = headlessOptions;
+            RunHeadlessMode(headlessOptions);
+        }
+
+        static void RunHeadlessMode(HeadlessCliOptions options)
+        {
+            Console.WriteLine("STARTING HEADLESS AI GENERATION...");
+            options.PrintSummary();
+
+            Library.Go(
+                fVoxelSizeMM:   options.VoxelSizeMm,
+                fnTask:         HeadlessGenerationTask,
+                strWindowTitle: "Tintreach — Computational Design Suite");
+        }
+
+        static void RunGuiMode()
+        {
             const float runtimeVoxelSizeMm = 0.25f;
 
             Library.Go(
                 fVoxelSizeMM:   runtimeVoxelSizeMm,
                 fnTask:         BuildSceneAndFins,
-                strWindowTitle: "UCC Rocketry — Computational Engineering Model");
+                strWindowTitle: "Tintreach — Computational Design Suite");
+        }
+
+        static void HeadlessGenerationTask()
+        {
+            HeadlessCliOptions options = s_headlessOptions
+                ?? throw new InvalidOperationException("Headless options were not initialized.");
+
+            string name = ResolveActiveRocketName();
+
+            if (options.Component == HeadlessComponent.SchelkinSpiral)
+            {
+                Console.WriteLine("Generating PDE engine (combustor" +
+                    (options.IncludePintleInjector ? " + pintle" : "") +
+                    " + spiral" +
+                    (options.IncludeDivergentNozzle ? " + nozzle)..." : ")..."));
+
+                Voxels voxCombustor = options.BuildPdeCombustor();
+                ExportPdeCombustorStl(voxCombustor);
+
+                string exportPath = Path.Combine("exports", $"{name}_pde_combustor.stl");
+                Console.WriteLine($"SUCCESS: Saved to {exportPath}");
+            }
+            else
+            {
+                Console.WriteLine("Generating pintle injector...");
+
+                var oInjector = options.ToInjector();
+                Voxels voxInjector = oInjector.voxConstruct();
+
+                ExportPintleInjectorStl(voxInjector);
+
+                string exportPath = Path.Combine("exports", $"{name}_pintle_injector.stl");
+                Console.WriteLine($"SUCCESS: Saved to {exportPath}");
+            }
+
+            Library.Log("Headless generation complete.");
+
+            new Thread(() =>
+            {
+                Thread.Sleep(500);
+                ExitProcess(0);
+            })
+            { IsBackground = true }.Start();
         }
 
         static void BuildSceneAndFins()
         {
             Scene.Build();
 
-            // =========================================================
-            // PHASE 3: ARGES PDE INJECTOR
-            // =========================================================
             if (Rockets.ShowPintleInjector)
             {
-                var oInjector = new UCCRocketry.Engines.PintleInjector();
+                var oInjector = new PintleInjector();
                 Voxels voxInjectorLocal = oInjector.voxConstruct();
 
                 if (Rockets.ExportPintleInjectorStl)
                     ExportPintleInjectorStl(voxInjectorLocal);
 
-                // Move the injector down the Z-axis by 600mm so it sits inside the tube
                 Vector3 vecInjectorShiftMm = new Vector3(0, 0, 600f);
                 Voxels voxInjectorTranslated = MeshUtility.voxApplyTransformation(
                     voxInjectorLocal,
                     vecPt => vecPt + vecInjectorShiftMm);
 
-                // Preview in scene coordinates (+600 mm Z vs CAD export).
                 Sh.PreviewVoxels(voxInjectorTranslated, Cp.clrRock, 1.0f);
             }
             else
             {
                 Library.Log("Skipping pintle injector (Rockets.ShowPintleInjector = false).");
             }
-            // =========================================================
+
+            if (Rockets.ShowPdeCombustor)
+            {
+                Voxels voxCombustorLocal = BuildPdeCombustorFromRockets();
+
+                if (Rockets.ExportPdeCombustorStl)
+                    ExportPdeCombustorStl(voxCombustorLocal);
+
+                Vector3 vecCombustorShiftMm = new Vector3(0, 0, 900f);
+                Voxels voxCombustorTranslated = MeshUtility.voxApplyTransformation(
+                    voxCombustorLocal,
+                    vecPt => vecPt + vecCombustorShiftMm);
+
+                Sh.PreviewVoxels(voxCombustorTranslated, Cp.clrWarning, 1.0f);
+            }
+            else
+            {
+                Library.Log("Skipping PDE combustor (Rockets.ShowPdeCombustor = false).");
+            }
 
             if (!Rockets.ShowFins)
             {
@@ -110,6 +215,52 @@ namespace UCCRocketry
                 ExportFinStl(voxFinAssembly);
         }
 
+        static Voxels BuildPdeCombustorFromRockets()
+        {
+            var oChamber = new CylindricalCombustionChamber(
+                fTubeInnerDiameter: Rockets.PdeChamberInnerDiameterMm,
+                fChamberLength: Rockets.PdeChamberLengthMm,
+                fWallThickness: Rockets.PdeChamberWallThicknessMm);
+
+            float fChamberOriginZ = 0f;
+            float fSpiralStartZ = 0f;
+            Voxels voxEngine = new Voxels();
+
+            if (Rockets.ShowPdePintleInjector)
+            {
+                var oInjector = new PintleInjector();
+                voxEngine += oInjector.voxConstruct();
+                fChamberOriginZ = oInjector.CombustorInletZMm();
+                fSpiralStartZ = oInjector.PintleTipZMm() + Rockets.PdeSpiralClearanceAfterPintleMm;
+            }
+
+            voxEngine += oChamber.voxConstructAt(fChamberOriginZ);
+
+            float? fPitch = Rockets.PdeSpiralPitchMm > 0f ? Rockets.PdeSpiralPitchMm : null;
+            var oSpiral = new ShchelkinSpiral(
+                oChamber,
+                Rockets.PdeSpiralLengthMm,
+                Rockets.PdeSpiralBlockingRatio,
+                fPitch,
+                fSpiralStartZ);
+
+            voxEngine += oSpiral.voxConstruct();
+
+            if (Rockets.ShowDivergentNozzle)
+            {
+                var oNozzle = new DivergentNozzle(
+                    oChamber,
+                    fExitRadius: Rockets.PdeNozzleExitDiameterMm / 2f,
+                    fNozzleLength: Rockets.PdeNozzleLengthMm,
+                    fWallThickness: Rockets.PdeNozzleWallThicknessMm,
+                    fSleeveLength: Rockets.PdeNozzleSleeveLengthMm);
+
+                voxEngine += oNozzle.voxConstructMountedOn(oChamber, fChamberOriginZ);
+            }
+
+            return voxEngine;
+        }
+
         static void ExportPintleInjectorStl(Voxels voxInjectorCadFrame)
         {
             string name = ResolveActiveRocketName();
@@ -117,6 +268,15 @@ namespace UCCRocketry
             string path = Path.Combine("exports", $"{name}_pintle_injector.stl");
             Sh.ExportVoxelsToSTLFile(voxInjectorCadFrame, path);
             Library.Log($"STL export (pintle, CAD frame Z=0 at bulkhead): {Path.GetFullPath(path)}.");
+        }
+
+        static void ExportPdeCombustorStl(Voxels voxCombustorCadFrame)
+        {
+            string name = ResolveActiveRocketName();
+            Directory.CreateDirectory("exports");
+            string path = Path.Combine("exports", $"{name}_pde_combustor.stl");
+            Sh.ExportVoxelsToSTLFile(voxCombustorCadFrame, path);
+            Library.Log($"STL export (PDE combustor, CAD frame Z=0 at inlet): {Path.GetFullPath(path)}.");
         }
 
         static void ExportFinStl(Voxels voxAssemblyWorld)
@@ -139,9 +299,5 @@ namespace UCCRocketry
             }
             return "rocket";
         }
-        
     }
-    
 }
-
-

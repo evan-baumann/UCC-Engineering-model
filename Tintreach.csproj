@@ -1,10 +1,10 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net9.0</TargetFramework>
-    <RootNamespace>UCCRocketry</RootNamespace>
-    <AssemblyName>UCCRocketry</AssemblyName>
+    <RootNamespace>Tintreach</RootNamespace>
+    <AssemblyName>Tintreach</AssemblyName>
     <ImplicitUsings>enable</ImplicitUsings>
     <!--
       The Leap71 libraries are pre-nullable-reference-types C#. We use the
@@ -28,7 +28,7 @@
     <PackageReference Include="PicoGK" Version="2.0.0" />
   </ItemGroup>
 
-  <ItemGroup Label="UCC Rocketry application code">
+  <ItemGroup Label="Tintreach Propulsion application code">
     <!--
       Glob the project root so any new top-level .cs file (e.g. a new
       Rockets/Scene/etc.) auto-compiles without requiring a .csproj edit.

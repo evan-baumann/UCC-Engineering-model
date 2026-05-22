@@ -1,6 +1,6 @@
-# UCC Engineering Model
+# Tintreach Engineering Model
 
-Parametric rocket geometry for UCC Rocketry, built on [PicoGK](https://github.com/leap71/PicoGK) and the LEAP71 ShapeKernel. The model generates **nosecones**, **fins** (with stability-driven sizing), and optional engine hardware as voxel previews and STL exports.
+Parametric rocket geometry for Tintreach Propulsion, built on [PicoGK](https://github.com/leap71/PicoGK) and the LEAP71 ShapeKernel. The model generates **nosecones**, **fins** (with stability-driven sizing), and optional engine hardware as voxel previews and STL exports.
 
 **Audience:** structural / design leads who need to change dimensions without touching the geometry engine.
 
@@ -15,8 +15,8 @@ Parametric rocket geometry for UCC Rocketry, built on [PicoGK](https://github.co
 - Git submodules initialized:
 
 ```bash
-git clone https://github.com/evan-baumann/UCC-Engineering-model.git
-cd UCC-Engineering-model
+git clone https://github.com/evan-baumann/tintreach_engineering_model.git
+cd tintreach_engineering_model
 git submodule update --init --recursive
 ```
 
@@ -298,4 +298,4 @@ LEAP71 libraries are git **submodules** under `LEAP71_ShapeKernel/`, etc.
 - **Change nose mathematics** (profile equations): `Nosecone/SmartNosecone.cs` — coordinate with aerodynamics.
 - **Change fin mesh rules** (tabs, airfoil, MDO): `Fins/SmartFinModule.cs` — coordinate with structures + GNC.
 
-For issues or access, contact the UCC Rocketry simulation / structures owners of this repository.
+For issues or access, contact the Tintreach Propulsion simulation / structures owners of this repository.

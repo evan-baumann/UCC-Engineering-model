@@ -1,5 +1,5 @@
 // =============================================================================
-//  UCC Rocketry — SmartNosecone
+//  Tintreach Propulsion — SmartNosecone
 //  -----------------------------------------------------------------------------
 //  Mach-aware parametric nosecone, built on top of the Leap71 ShapeKernel
 //  (BaseRevolve + LineModulation).
@@ -68,7 +68,7 @@ using System.Numerics;
 using PicoGK;
 using Leap71.ShapeKernel;
 
-namespace UCCRocketry.Nosecone
+namespace Tintreach.Nosecone
 {
     /// <summary>
     /// Mach-regime-aware parametric nosecone. The shape used is selected

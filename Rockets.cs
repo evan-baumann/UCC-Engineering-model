@@ -1,5 +1,5 @@
 // =============================================================================
-//  UCC Rocketry — Rockets
+//  Tintreach — Rockets
 //  -----------------------------------------------------------------------------
 //  EDIT THIS FILE to add a rocket, switch the active one, or toggle renders.
 //  Nothing else in the project should ever need editing for routine work.
@@ -34,7 +34,7 @@
 //  └──────────────────────────────────────────────────────────────────────┘
 // =============================================================================
 
-namespace UCCRocketry
+namespace Tintreach
 {
     /// <summary>
     /// User-facing rocket registry, active selection, and viewer toggles.
@@ -172,13 +172,13 @@ namespace UCCRocketry
         // ────────────────────────────────────────────────────────────── //
 
         /// <summary>
-        /// When true, the active <see cref="UCCRocketry.Nosecone.SmartNosecone"/> is built
+        /// When true, the active <see cref="Tintreach.Nosecone.SmartNosecone"/> is built
         /// and previewed. Set false to view other parts only (e.g. fins alone).
         /// </summary>
         public static readonly bool ShowNosecone = false;
 
         /// <summary>
-        /// When true, the <see cref="UCCRocketry.Fins.SmartFinModule"/> pass runs after the
+        /// When true, the <see cref="Tintreach.Fins.SmartFinModule"/> pass runs after the
         /// scene (optimization + voxel preview). Set false for nose-only or body-only.
         /// </summary>
         public static readonly bool ShowFins = true;
@@ -201,7 +201,7 @@ namespace UCCRocketry
         public static readonly bool ShowBodyTube = false;
 
         /// <summary>
-        /// When true, the Argos PDE pintle injector (<see cref="UCCRocketry.Engines.PintleInjector"/>)
+        /// When true, the Argos PDE pintle injector (<see cref="Tintreach.Engines.PintleInjector"/>)
         /// is built and previewed after the scene. Set false to hide it.
         /// </summary>
         public static readonly bool ShowPintleInjector = false;
@@ -214,6 +214,62 @@ namespace UCCRocketry
         /// bulkhead base at Z=0, not the +600 mm viewer shift).
         /// </summary>
         public static readonly bool ExportPintleInjectorStl = false;
+
+        /// <summary>
+        /// When true, the PDE combustor tube + Shchelkin spiral assembly is built and previewed.
+        /// Dimensions come from the <c>PdeChamber*</c> and <c>PdeSpiral*</c> fields below.
+        /// </summary>
+        public static readonly bool ShowPdeCombustor = false;
+
+        /// <summary>When true, writes <c>exports/{name}_pde_combustor.stl</c>.</summary>
+        public static readonly bool ExportPdeCombustorStl = false;
+
+        /// <summary>
+        /// When true, adds the divergent nozzle to the PDE assembly (mounted on the combustor open end).
+        /// Requires <see cref="ShowPdeCombustor"/>.
+        /// </summary>
+        public static readonly bool ShowDivergentNozzle = true;
+
+        /// <summary>
+        /// When true, mounts a <see cref="Tintreach.Engines.PintleInjector"/> at the combustor inlet (Z=0)
+        /// in the PDE assembly. Sizing comes from <c>Engines/PintleInjector.cs</c> constructor defaults only.
+        /// </summary>
+        public static readonly bool ShowPdePintleInjector = true;
+
+        /// <summary>
+        /// Axial gap (mm) between the pintle tip and the first turn of the Shchelkin spiral.
+        /// </summary>
+        public static readonly float PdeSpiralClearanceAfterPintleMm = 5f;
+
+        /// <summary>PDE combustor tube inner diameter (mm).</summary>
+        public static readonly float PdeChamberInnerDiameterMm = 50f;
+
+        /// <summary>PDE combustor tube axial length (mm).</summary>
+        public static readonly float PdeChamberLengthMm = 300f;
+
+        /// <summary>PDE combustor tube wall thickness (mm).</summary>
+        public static readonly float PdeChamberWallThicknessMm = 3f;
+
+        /// <summary>Shchelkin wire helix section length (mm).</summary>
+        public static readonly float PdeSpiralLengthMm = 300f;
+
+        /// <summary>Shchelkin helix pitch (mm). 0 = default to chamber inner diameter.</summary>
+        public static readonly float PdeSpiralPitchMm = 0f;
+
+        /// <summary>Target Shchelkin blockage ratio (0–1).</summary>
+        public static readonly float PdeSpiralBlockingRatio = 0.45f;
+
+        /// <summary>Nozzle exit inner diameter (mm).</summary>
+        public static readonly float PdeNozzleExitDiameterMm = 80f;
+
+        /// <summary>Diverging section length (mm).</summary>
+        public static readonly float PdeNozzleLengthMm = 80f;
+
+        /// <summary>Nozzle structural wall thickness (mm).</summary>
+        public static readonly float PdeNozzleWallThicknessMm = 4f;
+
+        /// <summary>Sleeve overlap length on combustor OD (mm).</summary>
+        public static readonly float PdeNozzleSleeveLengthMm = 20f;
 
         /// <summary>
         /// When true, the active nosecone is also exported to a binary STL
